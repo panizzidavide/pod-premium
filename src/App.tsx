@@ -1,29 +1,7 @@
-import { useEffect, useState } from "react"
-declare const ScanbotSDK: any
+import { useEffect, useMemo, useRef, useState } from "react"
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode"
 
-// 🔐 LICENSE KEY
-const LICENSE_KEY =
-  "Iw98BTOq+6men5KRzEAQwPFYGRJK/j" +
-  "5wZ09nF8Q0CsFkljx2XrBfsmErv9Ls" +
-  "12pOLBIZSfOQ6thjCBOyOLg0ifhM1f" +
-  "ngXgJutlSbGZaZ6PbAKdEdeV7r5+4y" +
-  "Ss37ELVpFicOZESw9wHBhoJ4pPXblU" +
-  "w1Le2eacIF8GUhPQ+Wp3an4Nj2pRBo" +
-  "NeG6h0r48/qqHqazTgpUvKWfvlP/8u" +
-  "npjl6lKtH4R8ebBI2W2bKvvNHHGlS7" +
-  "gzslN+vqbgKmaYygnkKORXfVtfrSiG" +
-  "9q6Uyz2aqzTsw0XzhxIFgWII2MwH5v" +
-  "2V76Lu0AJyB5YqdjQCfYZEZiHXdI7Z" +
-  "DGJ5NrrO313Q==\nU2NhbmJvdFNESw" +
-  "psb2NhbGhvc3R8ZG9tYWluOnBvZC1w" +
-  "cmVtaXVtLnZlcmNlbC5hcHAKMTc3Nz" +
-  "U5MzU5OQo4Mzg4NjA3Cjg=\n"
-
-// ---------------- TYPES ----------------
-
-type Screen = "home" | "scan" | "manual" | "history"
-
-// ---------------- PARSER ----------------
+type Screen = "home" | "scan" | "manual"
 
 function parseBarcode(barcode: string) {
   const value = barcode.trim()
@@ -37,72 +15,88 @@ function parseBarcode(barcode: string) {
   return `${prefix}-${suffix}`
 }
 
-// ---------------- UI ----------------
+function BarcodeScanner({
+  onDetected,
+}: {
+  onDetected: (value: string) => void
+}) {
+  const elementId = "reader"
+  const scannerRef = useRef<Html5Qrcode | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
-const Card = ({ children }: any) => (
-  <div className="rounded-2xl border p-4 bg-white shadow-sm">{children}</div>
-)
+  useEffect(() => {
+    const scanner = new Html5Qrcode(elementId, {
+      formatsToSupport: [Html5QrcodeSupportedFormats.CODE_128],
+    })
 
-const Button = ({ children, ...props }: any) => (
-  <button {...props} className="w-full bg-black text-white p-4 rounded-xl font-semibold">
-    {children}
-  </button>
-)
+    scannerRef.current = scanner
 
-// ---------------- APP ----------------
+    scanner.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 300, height: 100 } },
+      (decodedText) => onDetected(decodedText),
+      () => {}
+    )
+
+    return () => {
+      scanner.stop().catch(() => {})
+    }
+  }, [onDetected])
+
+  const handleFileChange = async (event: any) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const scanner = scannerRef.current ?? new Html5Qrcode(elementId)
+
+    try {
+      const decodedText = await scanner.scanFile(file, false)
+      onDetected(decodedText)
+    } catch {
+      alert("Errore lettura barcode")
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div id={elementId} className="rounded-xl overflow-hidden" />
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+
+      <button
+        onClick={() => fileInputRef.current?.click()}
+        className="w-full p-3 bg-white border rounded-xl"
+      >
+        📸 Scatta foto barcode
+      </button>
+    </div>
+  )
+}
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("home")
   const [barcode, setBarcode] = useState("")
   const [spedizione, setSpedizione] = useState("")
   const [error, setError] = useState("")
-  const [success, setSuccess] = useState("")
-  const [scanbotReady, setScanbotReady] = useState(false)
-  const [loading, setLoading] = useState(false)
 
-  // 🔥 INIT SCANBOT
-  useEffect(() => {
-    ;(async () => {
-      try {
-        await ScanbotSDK.initialize({
-          licenseKey: LICENSE_KEY,
-          enginePath:
-            "https://cdn.jsdelivr.net/npm/scanbot-web-sdk@latest/bundle/bin/complete/",
-        })
-        setScanbotReady(true)
-      } catch (err) {
-        console.error(err)
-        setError("Errore inizializzazione Scanbot")
-      }
-    })()
-  }, [])
+  const handleBarcode = (raw: string) => {
+    setBarcode(raw)
 
-  // 🔥 SCAN
-  const handleScan = async () => {
     try {
-      setLoading(true)
-      setError("")
-      setSuccess("")
-
-      const config = new ScanbotSDK.UI.Config.BarcodeScannerScreenConfiguration()
-      const result = await ScanbotSDK.UI.createBarcodeScanner(config)
-
-      const text = result?.items?.[0]?.text
-      if (!text) throw new Error("Nessun barcode")
-
-      setBarcode(text)
-
-      const parsed = parseBarcode(text)
+      const parsed = parseBarcode(raw)
       setSpedizione(parsed)
-      setSuccess("Barcode letto: " + parsed)
-    } catch (e) {
-      setError("Errore scansione")
-    } finally {
-      setLoading(false)
+      setError("")
+    } catch (e: any) {
+      setError(e.message)
     }
   }
-
-  // ---------------- UI ----------------
 
   return (
     <main className="p-4 max-w-md mx-auto space-y-4">
@@ -111,47 +105,54 @@ export default function App() {
         <>
           <h1 className="text-2xl font-bold">POD Manager</h1>
 
-          <Button onClick={() => setScreen("scan")}>
+          <button
+            onClick={() => setScreen("scan")}
+            className="w-full p-4 bg-black text-white rounded-xl"
+          >
             Scansiona barcode
-          </Button>
+          </button>
+
+          <button
+            onClick={() => setScreen("manual")}
+            className="w-full p-4 border rounded-xl"
+          >
+            Inserimento manuale
+          </button>
         </>
       )}
 
       {screen === "scan" && (
         <>
-          <Button onClick={() => setScreen("home")}>← Indietro</Button>
+          <button onClick={() => setScreen("home")}>← Indietro</button>
 
-          <Card>
-            <Button
-              onClick={handleScan}
-              disabled={!scanbotReady || loading}
-            >
-              {loading
-                ? "Apro scanner..."
-                : scanbotReady
-                ? "Apri scanner professionale"
-                : "Caricamento scanner..."}
-            </Button>
+          <BarcodeScanner onDetected={handleBarcode} />
 
-            <p className="text-sm mt-2 text-gray-500 text-center">
-              Scanner professionale (etichette difficili)
-            </p>
-          </Card>
-
-          <Card>
-            <p className="text-sm">Valore letto</p>
-            <p className="font-mono">{barcode}</p>
-          </Card>
-
-          {success && <div className="text-green-600">{success}</div>}
-          {error && <div className="text-red-600">{error}</div>}
+          <div>
+            <p className="text-sm">Barcode</p>
+            <p>{barcode}</p>
+          </div>
 
           {spedizione && (
-            <Card>
+            <div>
               <p className="text-sm">Spedizione</p>
               <p className="text-xl font-bold">{spedizione}</p>
-            </Card>
+            </div>
           )}
+
+          {error && <p className="text-red-600">{error}</p>}
+        </>
+      )}
+
+      {screen === "manual" && (
+        <>
+          <button onClick={() => setScreen("home")}>← Indietro</button>
+
+          <input
+            value={spedizione}
+            onChange={(e) => setSpedizione(e.target.value)}
+            placeholder="801-12345"
+            className="w-full p-4 border rounded-xl"
+          />
         </>
       )}
     </main>
