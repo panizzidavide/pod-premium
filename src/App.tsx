@@ -128,7 +128,7 @@ function HeroCard() {
           </p>
           <h2 className="mt-2 text-xl font-semibold">Acquisizione rapida POD</h2>
           <p className="mt-2 text-sm leading-6 text-slate-300">
-            Barcode, acquisizione documento, PDF e invio in un flusso pensato da smartphone.
+            Honeywell per barcode, fotocamera come fallback, poi POD e PDF.
           </p>
         </div>
         <div className="mt-1 h-3 w-3 rounded-full bg-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.8)]" />
@@ -455,7 +455,10 @@ export default function App() {
   const [search, setSearch] = useState("")
   const [filter, setFilter] = useState<"tutti" | UploadStatus>("tutti")
   const [honeywellValue, setHoneywellValue] = useState("")
+  const [useCamera, setUseCamera] = useState(false)
+
   const honeywellInputRef = useRef<HTMLInputElement | null>(null)
+  const honeywellTimerRef = useRef<number | null>(null)
 
   const filteredHistory = useMemo(() => {
     return mockHistory.filter((item) => {
@@ -467,7 +470,7 @@ export default function App() {
 
   useEffect(() => {
     if (screen === "scan") {
-      const t = setTimeout(() => {
+      const t = window.setTimeout(() => {
         honeywellInputRef.current?.focus()
       }, 150)
 
@@ -475,13 +478,38 @@ export default function App() {
     }
   }, [screen])
 
+  useEffect(() => {
+    if (!honeywellValue.trim()) {
+      return
+    }
+
+    if (honeywellTimerRef.current) {
+      window.clearTimeout(honeywellTimerRef.current)
+    }
+
+    honeywellTimerRef.current = window.setTimeout(() => {
+      handleHoneywellSubmit(honeywellValue)
+    }, 120)
+
+    return () => {
+      if (honeywellTimerRef.current) {
+        window.clearTimeout(honeywellTimerRef.current)
+      }
+    }
+  }, [honeywellValue])
+
   const goHome = () => {
     setError("")
     setSuccess("")
     setBarcode("")
     setSpedizione("")
     setHoneywellValue("")
+    setUseCamera(false)
     setScreen("home")
+  }
+
+  const focusHoneywell = () => {
+    honeywellInputRef.current?.focus()
   }
 
   const handleBarcodeValue = (rawValue: string) => {
@@ -501,9 +529,13 @@ export default function App() {
   }
 
   const handleHoneywellSubmit = (rawValue: string) => {
+    const cleanValue = rawValue.trim()
+    if (!cleanValue) return
+    if (spedizione) return
+
     try {
-      const result = parseBarcode(rawValue)
-      setBarcode(rawValue)
+      const result = parseBarcode(cleanValue)
+      setBarcode(cleanValue)
       setSpedizione(result)
       setError("")
       setSuccess(`Barcode letto correttamente. Numero spedizione: ${result}`)
@@ -536,7 +568,7 @@ export default function App() {
             subtitle="Scansiona il barcode oppure inserisci la spedizione manualmente."
           />
           <p className="mt-2 text-xs text-slate-400">
-            Versione: v1.5 - Honeywell + foto + live
+            Versione: v1.5 industriale - Honeywell principale
           </p>
 
           <HeroCard />
@@ -553,6 +585,7 @@ export default function App() {
                 setBarcode("")
                 setSpedizione("")
                 setHoneywellValue("")
+                setUseCamera(false)
                 setScreen("scan")
               }}
             />
@@ -586,41 +619,48 @@ export default function App() {
         <>
           <TopBar
             title="Scansione barcode"
-            subtitle="Usa Honeywell come metodo principale. In alternativa foto barcode o scansione live."
+            subtitle="Usa Honeywell come metodo principale. Attiva la fotocamera solo se serve."
             onBack={goHome}
           />
 
           <SectionCard title="Lettura Honeywell">
-            <div className="space-y-3">
-              <p className="text-sm text-slate-500">
-                Premi il trigger del lettore Honeywell. La lettura parte automaticamente.
-              </p>
+            <button
+              type="button"
+              onClick={focusHoneywell}
+              className="w-full rounded-[1.5rem] border border-slate-200 bg-slate-50/80 p-4 text-left"
+            >
+              <div className="space-y-3">
+                <p className="text-sm text-slate-500">
+                  Premi il trigger del lettore Honeywell. La lettura parte automaticamente.
+                </p>
 
-              <input
-                ref={honeywellInputRef}
-                value={honeywellValue}
-                onChange={(e) => setHoneywellValue(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    handleHoneywellSubmit(honeywellValue)
-                  }
-                }}
-                className="w-full rounded-[1.25rem] border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-900 outline-none"
-                placeholder="Pronto per Honeywell..."
-                autoCapitalize="off"
-                autoCorrect="off"
-                autoComplete="off"
-                spellCheck={false}
-              />
+                <input
+                  ref={honeywellInputRef}
+                  value={honeywellValue}
+                  onChange={(e) => setHoneywellValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault()
+                      handleHoneywellSubmit(honeywellValue)
+                    }
+                  }}
+                  className="w-full rounded-[1.25rem] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none"
+                  placeholder="Pronto per Honeywell..."
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
 
-              <p className="text-xs text-slate-400">
-                Metodo consigliato: Honeywell per barcode, foto per POD.
-              </p>
-            </div>
+                <p className="text-xs text-slate-400">
+                  Tocca questo riquadro se vuoi rifocalizzare il campo.
+                </p>
+              </div>
+            </button>
           </SectionCard>
 
           <div className="mt-4">
-            <SectionCard title="Scanner fotocamera">
+            <SectionCard title="Fotocamera di supporto">
               <div className="space-y-4">
                 <BarcodeScanner
                   scannerId="reader-photo"
@@ -637,22 +677,40 @@ export default function App() {
                   Usa la fotocamera per scattare una foto ravvicinata del barcode.
                 </p>
 
-                <div className="border-t border-slate-200 pt-4">
-                  <p className="mb-2 text-center text-xs text-slate-400">
-                    Oppure prova scansione live
-                  </p>
+                {!useCamera ? (
+                  <button
+                    onClick={() => setUseCamera(true)}
+                    className="w-full rounded-[1.25rem] border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm"
+                  >
+                    Usa scansione live
+                  </button>
+                ) : (
+                  <div className="border-t border-slate-200 pt-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <p className="text-xs text-slate-400">
+                        Scansione live attiva
+                      </p>
 
-                  <BarcodeScanner
-                    scannerId="reader-live"
-                    shouldScan={!spedizione}
-                    enablePhotoUpload={false}
-                    onDetected={handleBarcodeValue}
-                    onError={(msg) => {
-                      setSuccess("")
-                      setError(msg)
-                    }}
-                  />
-                </div>
+                      <button
+                        onClick={() => setUseCamera(false)}
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
+                      >
+                        Chiudi fotocamera
+                      </button>
+                    </div>
+
+                    <BarcodeScanner
+                      scannerId="reader-live"
+                      shouldScan={useCamera && !spedizione}
+                      enablePhotoUpload={false}
+                      onDetected={handleBarcodeValue}
+                      onError={(msg) => {
+                        setSuccess("")
+                        setError(msg)
+                      }}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="mt-4">
