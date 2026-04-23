@@ -439,7 +439,7 @@ export default function App() {
             subtitle="Scansiona il barcode oppure inserisci la spedizione manualmente."
           />
           <p className="mt-2 text-xs text-slate-400">
-            Versione: v1.2 - foto barcode
+            Versione: v1.3 - foto barcode principale
           </p>
 
           <HeroCard />
@@ -493,19 +493,39 @@ export default function App() {
           />
 
           <SectionCard title="Scanner fotocamera">
-            <BarcodeScanner
-              shouldScan={!spedizione}
-              onDetected={handleBarcodeValue}
-              onError={(msg) => {
-                setSuccess("")
-                setError(msg)
-              }}
-            />
+            <div className="space-y-4">
 
-            <div className="mt-4">
-              <label className="mb-2 block text-sm font-medium text-slate-600">Ultimo valore letto</label>
-              <TextInput value={barcode} readOnly />
-            </div>
+  {/* 📸 FOTO BARCODE (PRINCIPALE) */}
+  <BarcodeScanner
+    shouldScan={false}
+    onDetected={handleBarcodeValue}
+    onError={(msg) => {
+      setSuccess("")
+      setError(msg)
+    }}
+  />
+
+  <p className="text-sm text-slate-500 text-center">
+    Usa la fotocamera per scattare una foto ravvicinata del barcode.
+  </p>
+
+  {/* ⚡ SCANNER LIVE (SECONDARIO) */}
+  <div className="pt-4 border-t border-slate-200">
+    <p className="text-xs text-slate-400 mb-2 text-center">
+      Oppure prova scansione live
+    </p>
+
+    <BarcodeScanner
+      shouldScan={!spedizione}
+      onDetected={handleBarcodeValue}
+      onError={(msg) => {
+        setSuccess("")
+        setError(msg)
+      }}
+    />
+  </div>
+
+</div>
           </SectionCard>
 
           {error && (
