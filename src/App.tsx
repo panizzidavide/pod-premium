@@ -279,7 +279,7 @@ function BarcodeScanner({
   const elementId = "reader"
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const detectionLockedRef = useRef(false)
-
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   useEffect(() => {
     if (!shouldScan) {
       return
@@ -329,8 +329,52 @@ function BarcodeScanner({
       detectionLockedRef.current = false
     }
   }, [onDetected, onError, shouldScan])
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const file = event.target.files?.[0]
+  if (!file) return
 
-  return <div id={elementId} className="overflow-hidden rounded-[1.5rem]" />
+  try {
+    const scanner = scannerRef.current ?? new Html5Qrcode(elementId)
+    scannerRef.current = scanner
+
+    try {
+      if (scanner.isScanning) {
+        await scanner.stop()
+      }
+    } catch {
+      // niente
+    }
+
+    const decodedText = await scanner.scanFile(file, true)
+    onDetected(decodedText)
+  } catch {
+    onError("Impossibile leggere il barcode dalla foto. Prova con una foto più nitida o usa inserimento manuale.")
+  } finally {
+    event.target.value = ""
+  }
+}
+
+  return (
+  <div className="space-y-4">
+    <div id={elementId} className="overflow-hidden rounded-[1.5rem]" />
+
+    <input
+      ref={fileInputRef}
+      type="file"
+      accept="image/*"
+      capture="environment"
+      onChange={handleFileChange}
+      className="hidden"
+    />
+
+    <button
+      onClick={() => fileInputRef.current?.click()}
+      className="w-full rounded-[1.25rem] border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm"
+    >
+      Carica foto barcode
+    </button>
+  </div>
+)
 }
 
 export default function App() {
@@ -395,7 +439,7 @@ export default function App() {
             subtitle="Scansiona il barcode oppure inserisci la spedizione manualmente."
           />
           <p className="mt-2 text-xs text-slate-400">
-            Versione: v1.1 - qrbox 340x90
+            Versione: v1.2 - foto barcode
           </p>
 
           <HeroCard />
