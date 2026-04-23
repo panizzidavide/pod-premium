@@ -526,6 +526,10 @@ export default function App() {
   </div>
 
 </div>
+<div className="mt-4">
+  <label className="mb-2 block text-sm font-medium text-slate-600">Ultimo valore letto</label>
+  <TextInput value={barcode} readOnly />
+</div>
           </SectionCard>
 
           {error && (
