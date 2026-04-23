@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 declare const ScanbotSDK: any
 
 // 🔐 LICENSE KEY
@@ -34,13 +34,6 @@ type UploadItem = {
   errore?: string
 }
 
-// ---------------- MOCK ----------------
-
-const mockHistory: UploadItem[] = [
-  { id: 1, spedizione: "801-56789", file: "801-56789.pdf", pagine: 2, stato: "Inviato", data: "23/04/2026 09:14" },
-  { id: 2, spedizione: "807-123456", file: "807-123456.pdf", pagine: 1, stato: "Fallito", data: "23/04/2026 08:52" },
-  { id: 3, spedizione: "801-99881", file: "801-99881.pdf", pagine: 2, stato: "In coda", data: "22/04/2026 17:41" },
-]
 
 // ---------------- PARSER ----------------
 
