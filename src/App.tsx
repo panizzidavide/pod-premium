@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode"
+import { Html5Qrcode } from "html5-qrcode"
 
 type Screen = "home" | "scan" | "manual" | "history"
 type UploadStatus = "Inviato" | "Fallito" | "In coda"
@@ -289,10 +289,7 @@ function BarcodeScanner({
       return
     }
 
-    const scanner = new Html5Qrcode(scannerId, {
-      formatsToSupport: [Html5QrcodeSupportedFormats.CODE_128],
-      verbose: false,
-    })
+    const scanner = new Html5Qrcode(scannerId)
     scannerRef.current = scanner
     detectionLockedRef.current = false
 
@@ -393,10 +390,7 @@ function BarcodeScanner({
     if (!file) return
 
     try {
-      const scanner = scannerRef.current ?? new Html5Qrcode(scannerId, {
-        formatsToSupport: [Html5QrcodeSupportedFormats.CODE_128],
-        verbose: false,
-      })
+      const scanner = scannerRef.current ?? new Html5Qrcode(scannerId)
       scannerRef.current = scanner
 
       try {
@@ -460,6 +454,8 @@ export default function App() {
   const [success, setSuccess] = useState("")
   const [search, setSearch] = useState("")
   const [filter, setFilter] = useState<"tutti" | UploadStatus>("tutti")
+  const [honeywellValue, setHoneywellValue] = useState("")
+  const honeywellInputRef = useRef<HTMLInputElement | null>(null)
 
   const filteredHistory = useMemo(() => {
     return mockHistory.filter((item) => {
@@ -469,11 +465,22 @@ export default function App() {
     })
   }, [filter, search])
 
+  useEffect(() => {
+    if (screen === "scan") {
+      const t = setTimeout(() => {
+        honeywellInputRef.current?.focus()
+      }, 150)
+
+      return () => clearTimeout(t)
+    }
+  }, [screen])
+
   const goHome = () => {
     setError("")
     setSuccess("")
     setBarcode("")
     setSpedizione("")
+    setHoneywellValue("")
     setScreen("home")
   }
 
@@ -490,6 +497,21 @@ export default function App() {
     } catch (err) {
       setSuccess("")
       setError(err instanceof Error ? err.message : "Errore barcode")
+    }
+  }
+
+  const handleHoneywellSubmit = (rawValue: string) => {
+    try {
+      const result = parseBarcode(rawValue)
+      setBarcode(rawValue)
+      setSpedizione(result)
+      setError("")
+      setSuccess(`Barcode letto correttamente. Numero spedizione: ${result}`)
+      setHoneywellValue("")
+    } catch (err) {
+      setSuccess("")
+      setError(err instanceof Error ? err.message : "Errore barcode Honeywell")
+      setHoneywellValue("")
     }
   }
 
@@ -514,7 +536,7 @@ export default function App() {
             subtitle="Scansiona il barcode oppure inserisci la spedizione manualmente."
           />
           <p className="mt-2 text-xs text-slate-400">
-            Versione: v1.4 - foto preprocessata
+            Versione: v1.5 - Honeywell + foto + live
           </p>
 
           <HeroCard />
@@ -522,7 +544,7 @@ export default function App() {
           <div className="space-y-3">
             <ActionButton
               title="Scansiona barcode"
-              subtitle="Flusso rapido con lettura codice e acquisizione documento"
+              subtitle="Honeywell automatico, foto barcode o scansione live"
               icon="⌁"
               primary
               onClick={() => {
@@ -530,6 +552,7 @@ export default function App() {
                 setSuccess("")
                 setBarcode("")
                 setSpedizione("")
+                setHoneywellValue("")
                 setScreen("scan")
               }}
             />
@@ -563,52 +586,83 @@ export default function App() {
         <>
           <TopBar
             title="Scansione barcode"
-            subtitle="Consenti la fotocamera del browser e inquadra il barcode dell'etichetta."
+            subtitle="Usa Honeywell come metodo principale. In alternativa foto barcode o scansione live."
             onBack={goHome}
           />
 
-          <SectionCard title="Scanner fotocamera">
-            <div className="space-y-4">
-              <BarcodeScanner
-                scannerId="reader-photo"
-                shouldScan={false}
-                enablePhotoUpload={true}
-                onDetected={handleBarcodeValue}
-                onError={(msg) => {
-                  setSuccess("")
-                  setError(msg)
-                }}
-              />
-
-              <p className="text-center text-sm text-slate-500">
-                Usa la fotocamera per scattare una foto ravvicinata del barcode.
+          <SectionCard title="Lettura Honeywell">
+            <div className="space-y-3">
+              <p className="text-sm text-slate-500">
+                Premi il trigger del lettore Honeywell. La lettura parte automaticamente.
               </p>
 
-              <div className="border-t border-slate-200 pt-4">
-                <p className="mb-2 text-center text-xs text-slate-400">
-                  Oppure prova scansione live
-                </p>
+              <input
+                ref={honeywellInputRef}
+                value={honeywellValue}
+                onChange={(e) => setHoneywellValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleHoneywellSubmit(honeywellValue)
+                  }
+                }}
+                className="w-full rounded-[1.25rem] border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-900 outline-none"
+                placeholder="Pronto per Honeywell..."
+                autoCapitalize="off"
+                autoCorrect="off"
+                autoComplete="off"
+                spellCheck={false}
+              />
 
+              <p className="text-xs text-slate-400">
+                Metodo consigliato: Honeywell per barcode, foto per POD.
+              </p>
+            </div>
+          </SectionCard>
+
+          <div className="mt-4">
+            <SectionCard title="Scanner fotocamera">
+              <div className="space-y-4">
                 <BarcodeScanner
-                  scannerId="reader-live"
-                  shouldScan={!spedizione}
-                  enablePhotoUpload={false}
+                  scannerId="reader-photo"
+                  shouldScan={false}
+                  enablePhotoUpload={true}
                   onDetected={handleBarcodeValue}
                   onError={(msg) => {
                     setSuccess("")
                     setError(msg)
                   }}
                 />
-              </div>
-            </div>
 
-            <div className="mt-4">
-              <label className="mb-2 block text-sm font-medium text-slate-600">
-                Ultimo valore letto
-              </label>
-              <TextInput value={barcode} readOnly />
-            </div>
-          </SectionCard>
+                <p className="text-center text-sm text-slate-500">
+                  Usa la fotocamera per scattare una foto ravvicinata del barcode.
+                </p>
+
+                <div className="border-t border-slate-200 pt-4">
+                  <p className="mb-2 text-center text-xs text-slate-400">
+                    Oppure prova scansione live
+                  </p>
+
+                  <BarcodeScanner
+                    scannerId="reader-live"
+                    shouldScan={!spedizione}
+                    enablePhotoUpload={false}
+                    onDetected={handleBarcodeValue}
+                    onError={(msg) => {
+                      setSuccess("")
+                      setError(msg)
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <label className="mb-2 block text-sm font-medium text-slate-600">
+                  Ultimo valore letto
+                </label>
+                <TextInput value={barcode} readOnly />
+              </div>
+            </SectionCard>
+          </div>
 
           {error && (
             <div className="mt-4 rounded-[1.5rem] bg-red-50 p-4 text-sm text-red-700 ring-1 ring-red-200">
