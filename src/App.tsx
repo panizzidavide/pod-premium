@@ -22,18 +22,6 @@ const LICENSE_KEY =
 // ---------------- TYPES ----------------
 
 type Screen = "home" | "scan" | "manual" | "history"
-type UploadStatus = "Inviato" | "Fallito" | "In coda"
-
-type UploadItem = {
-  id: number
-  spedizione: string
-  file: string
-  pagine: number
-  stato: UploadStatus
-  data: string
-  errore?: string
-}
-
 
 // ---------------- PARSER ----------------
 
