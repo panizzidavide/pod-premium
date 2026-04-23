@@ -262,45 +262,48 @@ function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
 function BarcodeScanner({
   onDetected,
   onError,
+  shouldScan,
 }: {
   onDetected: (value: string) => void
   onError: (value: string) => void
+  shouldScan: boolean
 }) {
   const elementId = "reader"
   const scannerRef = useRef<Html5Qrcode | null>(null)
-  const startedRef = useRef(false)
+  const detectionLockedRef = useRef(false)
 
   useEffect(() => {
+    if (!shouldScan) {
+      return
+    }
+
     const scanner = new Html5Qrcode(elementId)
     scannerRef.current = scanner
+    detectionLockedRef.current = false
 
     const start = async () => {
       try {
         await scanner.start(
-  { facingMode: "environment" },
-  {
-    fps: 10,
-    qrbox: { width: 300, height: 180 },
-    formatsToSupport: [
-      Html5QrcodeSupportedFormats.CODE_128,
-      Html5QrcodeSupportedFormats.CODE_39,
-      Html5QrcodeSupportedFormats.EAN_13,
-      Html5QrcodeSupportedFormats.EAN_8,
-      Html5QrcodeSupportedFormats.QR_CODE,
-    ],
-    experimentalFeatures: {
-      useBarCodeDetectorIfSupported: true,
-    },
-  },
+          { facingMode: "environment" },
+          {
+            fps: 10,
+            qrbox: { width: 300, height: 180 },
+            formatsToSupport: [
+              Html5QrcodeSupportedFormats.CODE_128,
+              Html5QrcodeSupportedFormats.CODE_39,
+              Html5QrcodeSupportedFormats.EAN_13,
+              Html5QrcodeSupportedFormats.EAN_8,
+              Html5QrcodeSupportedFormats.QR_CODE,
+            ],
+          },
           (decodedText) => {
-            if (startedRef.current) {
-              onDetected(decodedText)
-            }
+            if (detectionLockedRef.current) return
+            detectionLockedRef.current = true
+            onDetected(decodedText)
           },
           () => {}
         )
-        startedRef.current = true
-      } catch (err) {
+      } catch {
         onError("Impossibile avviare la fotocamera. Controlla i permessi del browser.")
       }
     }
@@ -319,9 +322,9 @@ function BarcodeScanner({
         }
       }
       stopScanner()
-      startedRef.current = false
+      detectionLockedRef.current = false
     }
-  }, [onDetected, onError])
+  }, [onDetected, onError, shouldScan])
 
   return <div id={elementId} className="overflow-hidden rounded-[1.5rem]" />
 }
@@ -346,11 +349,13 @@ export default function App() {
   const goHome = () => {
     setError("")
     setSuccess("")
+    setBarcode("")
+    setSpedizione("")
     setScreen("home")
   }
 
   const handleBarcodeValue = (rawValue: string) => {
-    if (spedizione) return // blocca letture multiple
+    if (spedizione) return
 
     setBarcode(rawValue)
 
@@ -398,6 +403,7 @@ export default function App() {
                 setError("")
                 setSuccess("")
                 setBarcode("")
+                setSpedizione("")
                 setScreen("scan")
               }}
             />
@@ -437,6 +443,7 @@ export default function App() {
 
           <SectionCard title="Scanner fotocamera">
             <BarcodeScanner
+              shouldScan={!spedizione}
               onDetected={handleBarcodeValue}
               onError={(msg) => {
                 setSuccess("")
