@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode"
+import { useEffect, useMemo, useState } from "react"
 declare const ScanbotSDK: any
 
 type Screen = "home" | "scan" | "manual" | "history"
@@ -287,9 +286,24 @@ useEffect(() => {
   ;(async () => {
     try {
       await ScanbotSDK.initialize({
-        licenseKey: "INCOLLA_QUI_LA_TUA_TRIAL_KEY",
-        enginePath: "https://cdn.jsdelivr.net/npm/scanbot-web-sdk@latest/bundle/bin/complete/",
-      })
+  licenseKey:
+    "KWpJ1PVO/trUNzvp5dPeFRQ6sKyPOw" +
+    "EEg6l92j01WN3lxZUB2X5ttESzpqT" +
+    "yXfNQa8kI/DmHeUBQ39iIPKHgSxJd" +
+    "cFVN4iipt4Z06qyfFeOE5Kp9hgWpS" +
+    "3V9hVMWpXkkHoUP9NNuqsX1+qBvUvR" +
+    "udrm+eIZ6m2o6J29AVQ41s3GIVaJee" +
+    "BU6fP6SFR0JqJaayorOU2HZX+8Zdu" +
+    "f5qoqe1qiHR8PBVicjrq6y1efWOAxi" +
+    "E3tW0g0UBjlt2nhiR6IBJKLJlr8tg" +
+    "a/zHln3F2/slgay8UE8oMRVqjgQabH" +
+    "L8Rzohbnq3tEUDDS8oizqnzrCX8XQ0" +
+    "nKdiUr21pIQ--uN2NhbmJvdFNESw" +
+    "psb2NhbgHvc3R8cGfUaXpa6s5kYXZp" +
+    "ZGVaAG90bWFpbC5pdAoxNzC3NTkzNT" +
+    "k5CjgzODg2MDcK0A==",
+  enginePath: "https://cdn.jsdelivr.net/npm/scanbot-web-sdk@latest/bundle/bin/complete/",
+})
 
       if (mounted) {
         setScanbotReady(true)
