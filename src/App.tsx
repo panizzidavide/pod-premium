@@ -394,6 +394,9 @@ export default function App() {
             title="Acquisizione POD"
             subtitle="Scansiona il barcode oppure inserisci la spedizione manualmente."
           />
+          <p className="mt-2 text-xs text-slate-400">
+            Versione: v1.1 - qrbox 340x90
+          </p>
 
           <HeroCard />
 
