@@ -271,24 +271,28 @@ function BarcodeScanner({
   onDetected,
   onError,
   shouldScan,
+  scannerId,
+  enablePhotoUpload = true,
 }: {
   onDetected: (value: string) => void
   onError: (value: string) => void
   shouldScan: boolean
+  scannerId: string
+  enablePhotoUpload?: boolean
 }) {
-  const elementId = "reader"
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const detectionLockedRef = useRef(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+
   useEffect(() => {
     if (!shouldScan) {
       return
     }
 
-    const scanner = new Html5Qrcode(elementId, {
-  formatsToSupport: [Html5QrcodeSupportedFormats.CODE_128],
-  verbose: false,
-})
+    const scanner = new Html5Qrcode(scannerId, {
+      formatsToSupport: [Html5QrcodeSupportedFormats.CODE_128],
+      verbose: false,
+    })
     scannerRef.current = scanner
     detectionLockedRef.current = false
 
@@ -297,9 +301,9 @@ function BarcodeScanner({
         await scanner.start(
           { facingMode: "environment" },
           {
-  fps: 12,
-  qrbox: { width: 340, height: 90 },
-},
+            fps: 12,
+            qrbox: { width: 340, height: 90 },
+          },
           (decodedText) => {
             if (detectionLockedRef.current) return
             detectionLockedRef.current = true
@@ -328,53 +332,124 @@ function BarcodeScanner({
       stopScanner()
       detectionLockedRef.current = false
     }
-  }, [onDetected, onError, shouldScan])
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-  const file = event.target.files?.[0]
-  if (!file) return
+  }, [onDetected, onError, shouldScan, scannerId])
 
-  try {
-    const scanner = scannerRef.current ?? new Html5Qrcode(elementId)
-    scannerRef.current = scanner
+  const fileToDataUrl = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+
+  const dataUrlToFile = async (dataUrl: string, filename: string) => {
+    const response = await fetch(dataUrl)
+    const blob = await response.blob()
+    return new File([blob], filename, { type: "image/png" })
+  }
+
+  const preprocessBarcodeImage = (src: string) =>
+    new Promise<string>((resolve, reject) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement("canvas")
+        canvas.width = img.width
+        canvas.height = img.height
+
+        const ctx = canvas.getContext("2d")
+        if (!ctx) {
+          reject(new Error("Canvas non disponibile"))
+          return
+        }
+
+        ctx.drawImage(img, 0, 0)
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+        const data = imageData.data
+
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i]
+          const g = data[i + 1]
+          const b = data[i + 2]
+
+          let gray = 0.299 * r + 0.587 * g + 0.114 * b
+          gray = gray > 160 ? 255 : gray < 90 ? 0 : gray
+
+          data[i] = gray
+          data[i + 1] = gray
+          data[i + 2] = gray
+        }
+
+        ctx.putImageData(imageData, 0, 0)
+        resolve(canvas.toDataURL("image/png"))
+      }
+
+      img.onerror = reject
+      img.src = src
+    })
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
 
     try {
-      if (scanner.isScanning) {
-        await scanner.stop()
+      const scanner = scannerRef.current ?? new Html5Qrcode(scannerId, {
+        formatsToSupport: [Html5QrcodeSupportedFormats.CODE_128],
+        verbose: false,
+      })
+      scannerRef.current = scanner
+
+      try {
+        if (scanner.isScanning) {
+          await scanner.stop()
+        }
+      } catch {
+        // niente
+      }
+
+      const originalDataUrl = await fileToDataUrl(file)
+      const processedDataUrl = await preprocessBarcodeImage(originalDataUrl)
+      const processedFile = await dataUrlToFile(processedDataUrl, "barcode-processed.png")
+
+      try {
+        const decodedText = await scanner.scanFile(processedFile, false)
+        onDetected(decodedText)
+      } catch {
+        const fallbackDecodedText = await scanner.scanFile(file, false)
+        onDetected(fallbackDecodedText)
       }
     } catch {
-      // niente
+      onError("Impossibile leggere il barcode dalla foto. Prova con una foto più nitida o usa inserimento manuale.")
+    } finally {
+      event.target.value = ""
     }
-
-    const decodedText = await scanner.scanFile(file, false)
-    onDetected(decodedText)
-  } catch {
-    onError("Impossibile leggere il barcode dalla foto. Prova con una foto più nitida o usa inserimento manuale.")
-  } finally {
-    event.target.value = ""
   }
-}
 
   return (
-  <div className="space-y-4">
-    <div id={elementId} className="overflow-hidden rounded-[1.5rem]" />
+    <div className="space-y-4">
+      <div id={scannerId} className="overflow-hidden rounded-[1.5rem]" />
 
-    <input
-      ref={fileInputRef}
-      type="file"
-      accept="image/*"
-      capture="environment"
-      onChange={handleFileChange}
-      className="hidden"
-    />
+      {enablePhotoUpload && (
+        <>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleFileChange}
+            className="hidden"
+          />
 
-    <button
-      onClick={() => fileInputRef.current?.click()}
-      className="w-full rounded-[1.25rem] border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm"
-    >
-      Carica foto barcode
-    </button>
-  </div>
-)
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full rounded-[1.25rem] border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm"
+          >
+            Carica foto barcode
+          </button>
+        </>
+      )}
+    </div>
+  )
 }
 
 export default function App() {
@@ -439,7 +514,7 @@ export default function App() {
             subtitle="Scansiona il barcode oppure inserisci la spedizione manualmente."
           />
           <p className="mt-2 text-xs text-slate-400">
-            Versione: v1.3 - foto barcode principale
+            Versione: v1.4 - foto preprocessata
           </p>
 
           <HeroCard />
@@ -494,42 +569,45 @@ export default function App() {
 
           <SectionCard title="Scanner fotocamera">
             <div className="space-y-4">
+              <BarcodeScanner
+                scannerId="reader-photo"
+                shouldScan={false}
+                enablePhotoUpload={true}
+                onDetected={handleBarcodeValue}
+                onError={(msg) => {
+                  setSuccess("")
+                  setError(msg)
+                }}
+              />
 
-  {/* 📸 FOTO BARCODE (PRINCIPALE) */}
-  <BarcodeScanner
-    shouldScan={false}
-    onDetected={handleBarcodeValue}
-    onError={(msg) => {
-      setSuccess("")
-      setError(msg)
-    }}
-  />
+              <p className="text-center text-sm text-slate-500">
+                Usa la fotocamera per scattare una foto ravvicinata del barcode.
+              </p>
 
-  <p className="text-sm text-slate-500 text-center">
-    Usa la fotocamera per scattare una foto ravvicinata del barcode.
-  </p>
+              <div className="border-t border-slate-200 pt-4">
+                <p className="mb-2 text-center text-xs text-slate-400">
+                  Oppure prova scansione live
+                </p>
 
-  {/* ⚡ SCANNER LIVE (SECONDARIO) */}
-  <div className="pt-4 border-t border-slate-200">
-    <p className="text-xs text-slate-400 mb-2 text-center">
-      Oppure prova scansione live
-    </p>
+                <BarcodeScanner
+                  scannerId="reader-live"
+                  shouldScan={!spedizione}
+                  enablePhotoUpload={false}
+                  onDetected={handleBarcodeValue}
+                  onError={(msg) => {
+                    setSuccess("")
+                    setError(msg)
+                  }}
+                />
+              </div>
+            </div>
 
-    <BarcodeScanner
-      shouldScan={!spedizione}
-      onDetected={handleBarcodeValue}
-      onError={(msg) => {
-        setSuccess("")
-        setError(msg)
-      }}
-    />
-  </div>
-
-</div>
-<div className="mt-4">
-  <label className="mb-2 block text-sm font-medium text-slate-600">Ultimo valore letto</label>
-  <TextInput value={barcode} readOnly />
-</div>
+            <div className="mt-4">
+              <label className="mb-2 block text-sm font-medium text-slate-600">
+                Ultimo valore letto
+              </label>
+              <TextInput value={barcode} readOnly />
+            </div>
           </SectionCard>
 
           {error && (
@@ -551,7 +629,9 @@ export default function App() {
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
                     Numero spedizione
                   </p>
-                  <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{spedizione}</p>
+                  <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                    {spedizione}
+                  </p>
                 </div>
               </SectionCard>
             </div>
