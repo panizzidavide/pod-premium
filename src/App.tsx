@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Html5Qrcode } from "html5-qrcode"
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode"
 
 type Screen = "home" | "scan" | "manual" | "history"
 type UploadStatus = "Inviato" | "Fallito" | "In coda"
@@ -285,7 +285,10 @@ function BarcodeScanner({
       return
     }
 
-    const scanner = new Html5Qrcode(elementId)
+    const scanner = new Html5Qrcode(elementId, {
+  formatsToSupport: [Html5QrcodeSupportedFormats.CODE_128],
+  verbose: false,
+})
     scannerRef.current = scanner
     detectionLockedRef.current = false
 
@@ -294,9 +297,9 @@ function BarcodeScanner({
         await scanner.start(
           { facingMode: "environment" },
           {
-            fps: 10,
-  qrbox: { width: 300, height: 180 },
-          },
+  fps: 12,
+  qrbox: { width: 320, height: 120 },
+},
           (decodedText) => {
             if (detectionLockedRef.current) return
             detectionLockedRef.current = true
