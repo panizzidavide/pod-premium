@@ -44,17 +44,25 @@ const mockHistory: UploadItem[] = [
 
 function parseBarcode(barcode: string) {
   const value = barcode.trim()
-  const prefix = value.slice(0, 3)
-  const commaIndex = value.indexOf(",")
 
-  if (!value || prefix.length < 3 || commaIndex === -1) {
+  if (!value) {
     throw new Error("Barcode non valido. Inserisci il numero spedizione manualmente.")
   }
 
+  const commaIndex = value.indexOf(",")
+  if (commaIndex === -1) {
+    throw new Error("Barcode non valido. Inserisci il numero spedizione manualmente.")
+  }
+
+  const prefix = value.slice(0, 3)
   const suffix = value.slice(commaIndex + 1).trim()
 
-  if (!suffix) {
-    throw new Error("Barcode non valido. Inserisci il numero spedizione manualmente.")
+  if (!/^\d{3}$/.test(prefix)) {
+    throw new Error("Barcode non valido. Prefisso non corretto.")
+  }
+
+  if (!/^\d+$/.test(suffix)) {
+    throw new Error("Barcode non valido. Parte finale non corretta.")
   }
 
   return `${prefix}-${suffix}`
