@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode"
+import { Html5Qrcode } from "html5-qrcode"
 
 type Screen = "home" | "scan" | "manual" | "history"
 type UploadStatus = "Inviato" | "Fallito" | "In coda"
@@ -287,14 +287,7 @@ function BarcodeScanner({
           { facingMode: "environment" },
           {
             fps: 10,
-            qrbox: { width: 300, height: 180 },
-            formatsToSupport: [
-              Html5QrcodeSupportedFormats.CODE_128,
-              Html5QrcodeSupportedFormats.CODE_39,
-              Html5QrcodeSupportedFormats.EAN_13,
-              Html5QrcodeSupportedFormats.EAN_8,
-              Html5QrcodeSupportedFormats.QR_CODE,
-            ],
+  qrbox: { width: 300, height: 180 },
           },
           (decodedText) => {
             if (detectionLockedRef.current) return
