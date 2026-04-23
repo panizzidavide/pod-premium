@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode"
+declare const ScanbotSDK: any
 
 type Screen = "home" | "scan" | "manual" | "history"
 type UploadStatus = "Inviato" | "Fallito" | "In coda"
@@ -460,6 +461,33 @@ export default function App() {
   const [success, setSuccess] = useState("")
   const [search, setSearch] = useState("")
   const [filter, setFilter] = useState<"tutti" | UploadStatus>("tutti")
+  const [scanbotReady, setScanbotReady] = useState(false)
+  const [scanbotLoading, setScanbotLoading] = useState(false)
+
+useEffect(() => {
+  let mounted = true
+
+  ;(async () => {
+    try {
+      await ScanbotSDK.initialize({
+        licenseKey: "INCOLLA_QUI_LA_TUA_TRIAL_KEY",
+        enginePath: "https://cdn.jsdelivr.net/npm/scanbot-web-sdk@latest/bundle/bin/complete/",
+      })
+
+      if (mounted) {
+        setScanbotReady(true)
+      }
+    } catch {
+      if (mounted) {
+        setError("Scanbot non inizializzato correttamente.")
+      }
+    }
+  })()
+
+  return () => {
+    mounted = false
+  }
+}, [])
 
   const filteredHistory = useMemo(() => {
     return mockHistory.filter((item) => {
@@ -505,6 +533,29 @@ export default function App() {
     setSuccess(`Numero spedizione confermato: ${value}`)
   }
 
+const handleScanbotScan = async () => {
+  try {
+    setError("")
+    setSuccess("")
+    setScanbotLoading(true)
+
+    const config = new ScanbotSDK.UI.Config.BarcodeScannerScreenConfiguration()
+    const result = await ScanbotSDK.UI.createBarcodeScanner(config)
+
+    const rawValue = result?.items?.[0]?.text
+    if (!rawValue) {
+      setError("Nessun barcode rilevato.")
+      return
+    }
+
+    handleBarcodeValue(rawValue)
+  } catch {
+    setError("Errore durante la scansione Scanbot.")
+  } finally {
+    setScanbotLoading(false)
+  }
+}
+
   return (
     <Shell>
       {screen === "home" && (
@@ -514,7 +565,7 @@ export default function App() {
             subtitle="Scansiona il barcode oppure inserisci la spedizione manualmente."
           />
           <p className="mt-2 text-xs text-slate-400">
-            Versione: v1.4 - foto preprocessata
+            Versione: v1.5 - Scanbot RTU
           </p>
 
           <HeroCard />
@@ -569,44 +620,28 @@ export default function App() {
 
           <SectionCard title="Scanner fotocamera">
             <div className="space-y-4">
-              <BarcodeScanner
-                scannerId="reader-photo"
-                shouldScan={false}
-                enablePhotoUpload={true}
-                onDetected={handleBarcodeValue}
-                onError={(msg) => {
-                  setSuccess("")
-                  setError(msg)
-                }}
-              />
+              <button
+                onClick={handleScanbotScan}
+                disabled={!scanbotReady || scanbotLoading}
+                className="w-full rounded-[1.25rem] bg-slate-950 px-4 py-4 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {scanbotLoading
+                  ? "Apro scanner..."
+                  : scanbotReady
+                  ? "Apri scanner professionale"
+                  : "Inizializzazione scanner..."}
+              </button>
 
               <p className="text-center text-sm text-slate-500">
-                Usa la fotocamera per scattare una foto ravvicinata del barcode.
+                Scanner professionale per barcode difficili (etichette arancioni)
               </p>
 
-              <div className="border-t border-slate-200 pt-4">
-                <p className="mb-2 text-center text-xs text-slate-400">
-                  Oppure prova scansione live
-                </p>
-
-                <BarcodeScanner
-                  scannerId="reader-live"
-                  shouldScan={!spedizione}
-                  enablePhotoUpload={false}
-                  onDetected={handleBarcodeValue}
-                  onError={(msg) => {
-                    setSuccess("")
-                    setError(msg)
-                  }}
-                />
+              <div className="mt-4">
+                <label className="mb-2 block text-sm font-medium text-slate-600">
+                  Ultimo valore letto
+                </label>
+                <TextInput value={barcode} readOnly />
               </div>
-            </div>
-
-            <div className="mt-4">
-              <label className="mb-2 block text-sm font-medium text-slate-600">
-                Ultimo valore letto
-              </label>
-              <TextInput value={barcode} readOnly />
             </div>
           </SectionCard>
 
