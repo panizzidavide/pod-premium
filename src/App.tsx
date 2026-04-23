@@ -298,7 +298,7 @@ function BarcodeScanner({
           { facingMode: "environment" },
           {
   fps: 12,
-  qrbox: { width: 320, height: 120 },
+  qrbox: { width: 340, height: 90 },
 },
           (decodedText) => {
             if (detectionLockedRef.current) return
