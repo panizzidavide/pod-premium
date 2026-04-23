@@ -345,7 +345,7 @@ function BarcodeScanner({
       // niente
     }
 
-    const decodedText = await scanner.scanFile(file, true)
+    const decodedText = await scanner.scanFile(file, false)
     onDetected(decodedText)
   } catch {
     onError("Impossibile leggere il barcode dalla foto. Prova con una foto più nitida o usa inserimento manuale.")
