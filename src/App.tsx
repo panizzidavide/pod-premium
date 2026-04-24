@@ -729,7 +729,23 @@ const handleUploadPdf = async () => {
       throw new Error(`Make errore ${res.status}: ${text}`)
     }
 
-    setSuccess(`PDF inviato a Make: ${spedizione}.pdf`)
+    setSuccess(`PDF inviato correttamente: ${spedizione}.pdf`)
+navigator.vibrate?.(200)
+
+setTimeout(() => {
+  setBarcode("")
+  setSpedizione("")
+  setError("")
+  setSuccess("")
+  setHoneywellValue("")
+  setUseCamera(false)
+  setPodPage1(null)
+  setPodPage2(null)
+  setPodPage1Preview("")
+  setPodPage2Preview("")
+  setPdfBlob(null)
+  setScreen("home")
+}, 1200)
   } catch (err) {
     setError(err instanceof Error ? err.message : "Errore invio Make")
   } finally {
