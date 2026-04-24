@@ -723,8 +723,10 @@ const handleUploadPdf = async () => {
       body: formData,
     })
 
+    const text = await res.text()
+
     if (!res.ok) {
-      throw new Error("Make non ha accettato il PDF.")
+      throw new Error(`Make errore ${res.status}: ${text}`)
     }
 
     setSuccess(`PDF inviato a Make: ${spedizione}.pdf`)
