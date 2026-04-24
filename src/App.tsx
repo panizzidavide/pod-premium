@@ -140,7 +140,7 @@ function HeroCard() {
           </p>
           <h2 className="mt-2 text-xl font-semibold">Acquisizione rapida POD</h2>
           <p className="mt-2 text-sm leading-6 text-slate-300">
-            Honeywell per barcode, fotocamera come fallback, PDF automatico e invio FTP via backend.
+            Honeywell per barcode, fotocamera come fallback, PDF automatico e invio FTP tramite Make.
           </p>
         </div>
         <div className="mt-1 h-3 w-3 rounded-full bg-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.8)]" />
@@ -702,6 +702,7 @@ export default function App() {
     URL.revokeObjectURL(url)
   }
 
+
 const handleUploadPdf = async () => {
   if (!pdfBlob || !spedizione) {
     setError("Prima genera il PDF.")
@@ -730,22 +731,22 @@ const handleUploadPdf = async () => {
     }
 
     setSuccess(`PDF inviato correttamente: ${spedizione}.pdf`)
-navigator.vibrate?.(200)
+    navigator.vibrate?.(200)
 
-setTimeout(() => {
-  setBarcode("")
-  setSpedizione("")
-  setError("")
-  setSuccess("")
-  setHoneywellValue("")
-  setUseCamera(false)
-  setPodPage1(null)
-  setPodPage2(null)
-  setPodPage1Preview("")
-  setPodPage2Preview("")
-  setPdfBlob(null)
-  setScreen("home")
-}, 1200)
+    setTimeout(() => {
+      setBarcode("")
+      setSpedizione("")
+      setError("")
+      setSuccess("")
+      setHoneywellValue("")
+      setUseCamera(false)
+      setPodPage1(null)
+      setPodPage2(null)
+      setPodPage1Preview("")
+      setPodPage2Preview("")
+      setPdfBlob(null)
+      setScreen("home")
+    }, 1200)
   } catch (err) {
     setError(err instanceof Error ? err.message : "Errore invio Make")
   } finally {
