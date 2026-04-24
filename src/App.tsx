@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Html5Qrcode } from "html5-qrcode"
+import { jsPDF } from "jspdf"
 
-type Screen = "home" | "scan" | "manual" | "history"
+type Screen = "home" | "scan" | "manual" | "pod" | "history"
 type UploadStatus = "Inviato" | "Fallito" | "In coda"
 
 type UploadItem = {
@@ -13,6 +14,8 @@ type UploadItem = {
   data: string
   errore?: string
 }
+
+const MAKE_WEBHOOK_URL = "https://hook.eu1.make.com/tvnamews4hfy1m1v6lt8aqv9q2oitq7m"
 
 const mockHistory: UploadItem[] = [
   {
@@ -66,6 +69,15 @@ function parseBarcode(barcode: string) {
   }
 
   return `${prefix}-${suffix}`
+}
+
+function fileToDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -128,7 +140,7 @@ function HeroCard() {
           </p>
           <h2 className="mt-2 text-xl font-semibold">Acquisizione rapida POD</h2>
           <p className="mt-2 text-sm leading-6 text-slate-300">
-            Honeywell per barcode, fotocamera come fallback, poi POD e PDF.
+            Honeywell per barcode, fotocamera come fallback, PDF automatico e invio FTP via backend.
           </p>
         </div>
         <div className="mt-1 h-3 w-3 rounded-full bg-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.8)]" />
@@ -285,9 +297,7 @@ function BarcodeScanner({
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
-    if (!shouldScan) {
-      return
-    }
+    if (!shouldScan) return
 
     const scanner = new Html5Qrcode(scannerId)
     scannerRef.current = scanner
@@ -297,10 +307,7 @@ function BarcodeScanner({
       try {
         await scanner.start(
           { facingMode: "environment" },
-          {
-            fps: 12,
-            qrbox: { width: 340, height: 90 },
-          },
+          { fps: 12, qrbox: { width: 340, height: 90 } },
           (decodedText) => {
             if (detectionLockedRef.current) return
             detectionLockedRef.current = true
@@ -331,7 +338,7 @@ function BarcodeScanner({
     }
   }, [onDetected, onError, shouldScan, scannerId])
 
-  const fileToDataUrl = (file: File) =>
+  const fileToDataUrlLocal = (file: File) =>
     new Promise<string>((resolve, reject) => {
       const reader = new FileReader()
       reader.onload = () => resolve(reader.result as string)
@@ -401,7 +408,7 @@ function BarcodeScanner({
         // niente
       }
 
-      const originalDataUrl = await fileToDataUrl(file)
+      const originalDataUrl = await fileToDataUrlLocal(file)
       const processedDataUrl = await preprocessBarcodeImage(originalDataUrl)
       const processedFile = await dataUrlToFile(processedDataUrl, "barcode-processed.png")
 
@@ -446,6 +453,25 @@ function BarcodeScanner({
   )
 }
 
+function SpedizioneCard({ spedizione }: { spedizione: string }) {
+  if (!spedizione) return null
+
+  return (
+    <div className="mb-4">
+      <SectionCard title="Spedizione estratta">
+        <div className="rounded-[1.25rem] bg-slate-50 p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+            Numero spedizione
+          </p>
+          <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+            {spedizione}
+          </p>
+        </div>
+      </SectionCard>
+    </div>
+  )
+}
+
 export default function App() {
   const [screen, setScreen] = useState<Screen>("home")
   const [barcode, setBarcode] = useState("")
@@ -456,6 +482,13 @@ export default function App() {
   const [filter, setFilter] = useState<"tutti" | UploadStatus>("tutti")
   const [honeywellValue, setHoneywellValue] = useState("")
   const [useCamera, setUseCamera] = useState(false)
+  const [podPage1, setPodPage1] = useState<File | null>(null)
+  const [podPage2, setPodPage2] = useState<File | null>(null)
+  const [podPage1Preview, setPodPage1Preview] = useState("")
+  const [podPage2Preview, setPodPage2Preview] = useState("")
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null)
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
 
   const honeywellInputRef = useRef<HTMLInputElement | null>(null)
   const honeywellTimerRef = useRef<number | null>(null)
@@ -479,9 +512,7 @@ export default function App() {
   }, [screen])
 
   useEffect(() => {
-    if (!honeywellValue.trim()) {
-      return
-    }
+    if (!honeywellValue.trim()) return
 
     if (honeywellTimerRef.current) {
       window.clearTimeout(honeywellTimerRef.current)
@@ -505,7 +536,17 @@ export default function App() {
     setSpedizione("")
     setHoneywellValue("")
     setUseCamera(false)
+    setPodPage1(null)
+    setPodPage2(null)
+    setPodPage1Preview("")
+    setPodPage2Preview("")
+    setPdfBlob(null)
     setScreen("home")
+  }
+
+  const goToPodStep = () => {
+    setUseCamera(false)
+    setScreen("pod")
   }
 
   const focusHoneywell = () => {
@@ -522,6 +563,10 @@ export default function App() {
       setSpedizione(result)
       setError("")
       setSuccess(`Barcode letto correttamente. Numero spedizione: ${result}`)
+
+      window.setTimeout(() => {
+        setScreen("pod")
+      }, 350)
     } catch (err) {
       setSuccess("")
       setError(err instanceof Error ? err.message : "Errore barcode")
@@ -540,6 +585,10 @@ export default function App() {
       setError("")
       setSuccess(`Barcode letto correttamente. Numero spedizione: ${result}`)
       setHoneywellValue("")
+
+      window.setTimeout(() => {
+        setScreen("pod")
+      }, 350)
     } catch (err) {
       setSuccess("")
       setError(err instanceof Error ? err.message : "Errore barcode Honeywell")
@@ -554,10 +603,137 @@ export default function App() {
       setError("Inserisci un numero spedizione valido.")
       return
     }
-    setSpedizione(value)
     setError("")
     setSuccess(`Numero spedizione confermato: ${value}`)
+    setScreen("pod")
   }
+
+  const handlePodFile = async (
+    file: File | null,
+    page: 1 | 2
+  ) => {
+    if (!file) return
+
+    const preview = await fileToDataUrl(file)
+
+    if (page === 1) {
+      setPodPage1(file)
+      setPodPage1Preview(preview)
+    } else {
+      setPodPage2(file)
+      setPodPage2Preview(preview)
+    }
+
+    setPdfBlob(null)
+  }
+
+  const addImageToPdfPage = async (pdf: jsPDF, file: File, firstPage: boolean) => {
+    const dataUrl = await fileToDataUrl(file)
+    const img = new Image()
+
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve()
+      img.onerror = reject
+      img.src = dataUrl
+    })
+
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+
+    const imgWidth = img.width
+    const imgHeight = img.height
+
+    const ratio = Math.min(pageWidth / imgWidth, pageHeight / imgHeight)
+    const renderWidth = imgWidth * ratio
+    const renderHeight = imgHeight * ratio
+
+    const x = (pageWidth - renderWidth) / 2
+    const y = (pageHeight - renderHeight) / 2
+
+    if (!firstPage) {
+      pdf.addPage()
+    }
+
+    pdf.addImage(dataUrl, "JPEG", x, y, renderWidth, renderHeight)
+  }
+
+  const handleGeneratePdf = async () => {
+    if (!spedizione) {
+      setError("Manca il numero spedizione.")
+      return
+    }
+
+    if (!podPage1) {
+      setError("Carica almeno la prima pagina POD.")
+      return
+    }
+
+    try {
+      setIsGeneratingPdf(true)
+      setError("")
+      setSuccess("")
+
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" })
+
+      await addImageToPdfPage(pdf, podPage1, true)
+
+      if (podPage2) {
+        await addImageToPdfPage(pdf, podPage2, false)
+      }
+
+      const blob = pdf.output("blob")
+      setPdfBlob(blob)
+      setSuccess(`PDF creato correttamente: ${spedizione}.pdf`)
+    } catch {
+      setError("Errore durante la creazione del PDF.")
+    } finally {
+      setIsGeneratingPdf(false)
+    }
+  }
+
+  const handleDownloadPdf = () => {
+    if (!pdfBlob || !spedizione) return
+
+    const url = URL.createObjectURL(pdfBlob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `${spedizione}.pdf`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+const handleUploadPdf = async () => {
+  if (!pdfBlob || !spedizione) {
+    setError("Prima genera il PDF.")
+    return
+  }
+
+  try {
+    setIsUploading(true)
+    setError("")
+    setSuccess("")
+
+    const formData = new FormData()
+    formData.append("spedizione", spedizione)
+    formData.append("filename", `${spedizione}.pdf`)
+    formData.append("file", pdfBlob, `${spedizione}.pdf`)
+
+    const res = await fetch(MAKE_WEBHOOK_URL, {
+      method: "POST",
+      body: formData,
+    })
+
+    if (!res.ok) {
+      throw new Error("Make non ha accettato il PDF.")
+    }
+
+    setSuccess(`PDF inviato a Make: ${spedizione}.pdf`)
+  } catch (err) {
+    setError(err instanceof Error ? err.message : "Errore invio Make")
+  } finally {
+    setIsUploading(false)
+  }
+}
 
   return (
     <Shell>
@@ -568,7 +744,7 @@ export default function App() {
             subtitle="Scansiona il barcode oppure inserisci la spedizione manualmente."
           />
           <p className="mt-2 text-xs text-slate-400">
-            Versione: v1.5 industriale - Honeywell principale
+            Versione: v1.7 industriale - Make FTP
           </p>
 
           <HeroCard />
@@ -586,6 +762,11 @@ export default function App() {
                 setSpedizione("")
                 setHoneywellValue("")
                 setUseCamera(false)
+                setPodPage1(null)
+                setPodPage2(null)
+                setPodPage1Preview("")
+                setPodPage2Preview("")
+                setPdfBlob(null)
                 setScreen("scan")
               }}
             />
@@ -622,6 +803,8 @@ export default function App() {
             subtitle="Usa Honeywell come metodo principale. Attiva la fotocamera solo se serve."
             onBack={goHome}
           />
+
+          <SpedizioneCard spedizione={spedizione} />
 
           <SectionCard title="Lettura Honeywell">
             <button
@@ -687,9 +870,7 @@ export default function App() {
                 ) : (
                   <div className="border-t border-slate-200 pt-4">
                     <div className="mb-3 flex items-center justify-between gap-3">
-                      <p className="text-xs text-slate-400">
-                        Scansione live attiva
-                      </p>
+                      <p className="text-xs text-slate-400">Scansione live attiva</p>
 
                       <button
                         onClick={() => setUseCamera(false)}
@@ -722,6 +903,12 @@ export default function App() {
             </SectionCard>
           </div>
 
+          {spedizione && (
+            <div className="mt-4">
+              <PrimaryButton onClick={goToPodStep}>Continua con POD</PrimaryButton>
+            </div>
+          )}
+
           {error && (
             <div className="mt-4 rounded-[1.5rem] bg-red-50 p-4 text-sm text-red-700 ring-1 ring-red-200">
               {error}
@@ -733,19 +920,84 @@ export default function App() {
               {success}
             </div>
           )}
+        </>
+      )}
 
-          {spedizione && (
-            <div className="mt-4">
-              <SectionCard title="Spedizione estratta">
-                <div className="rounded-[1.25rem] bg-slate-50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-                    Numero spedizione
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-                    {spedizione}
-                  </p>
-                </div>
-              </SectionCard>
+      {screen === "pod" && (
+        <>
+          <TopBar
+            title="Foto POD"
+            subtitle="Scatta una o due foto del POD, genera il PDF e invialo su FTP."
+            onBack={() => setScreen("scan")}
+          />
+
+          <SpedizioneCard spedizione={spedizione} />
+
+          <SectionCard title="Pagina 1 POD">
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={(e) => handlePodFile(e.target.files?.[0] ?? null, 1)}
+              className="block w-full text-sm text-slate-700"
+            />
+
+            {podPage1Preview && (
+              <img
+                src={podPage1Preview}
+                alt="Anteprima POD pagina 1"
+                className="mt-4 w-full rounded-[1.25rem] border border-slate-200"
+              />
+            )}
+          </SectionCard>
+
+          <div className="mt-4">
+            <SectionCard title="Pagina 2 POD (opzionale)">
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(e) => handlePodFile(e.target.files?.[0] ?? null, 2)}
+                className="block w-full text-sm text-slate-700"
+              />
+
+              {podPage2Preview && (
+                <img
+                  src={podPage2Preview}
+                  alt="Anteprima POD pagina 2"
+                  className="mt-4 w-full rounded-[1.25rem] border border-slate-200"
+                />
+              )}
+            </SectionCard>
+          </div>
+
+          <div className="mt-4 space-y-3">
+            <PrimaryButton onClick={handleGeneratePdf} disabled={isGeneratingPdf}>
+              {isGeneratingPdf ? "Genero PDF..." : "Genera PDF"}
+            </PrimaryButton>
+
+            <button
+              onClick={handleDownloadPdf}
+              disabled={!pdfBlob}
+              className="w-full rounded-[1.25rem] border border-slate-200 bg-white px-4 py-4 text-sm font-semibold text-slate-700 shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Scarica PDF
+            </button>
+
+            <PrimaryButton onClick={handleUploadPdf} disabled={!pdfBlob || isUploading}>
+              {isUploading ? "Invio su FTP..." : "Invia su FTP"}
+            </PrimaryButton>
+          </div>
+
+          {error && (
+            <div className="mt-4 rounded-[1.5rem] bg-red-50 p-4 text-sm text-red-700 ring-1 ring-red-200">
+              {error}
+            </div>
+          )}
+
+          {success && (
+            <div className="mt-4 rounded-[1.5rem] bg-emerald-50 p-4 text-sm text-emerald-700 ring-1 ring-emerald-200">
+              {success}
             </div>
           )}
         </>
@@ -758,6 +1010,8 @@ export default function App() {
             subtitle="Inserisci la spedizione quando il barcode manca o non è leggibile."
             onBack={goHome}
           />
+
+          <SpedizioneCard spedizione={spedizione} />
 
           <SectionCard title="Numero spedizione">
             <label className="mb-2 block text-sm font-medium text-slate-600">Inserisci spedizione</label>
@@ -783,8 +1037,11 @@ export default function App() {
             </div>
           )}
 
-          <div className="mt-4">
+          <div className="mt-4 space-y-3">
             <PrimaryButton onClick={handleManualConfirm}>Conferma spedizione</PrimaryButton>
+            {spedizione && (
+              <PrimaryButton onClick={() => setScreen("pod")}>Vai a foto POD</PrimaryButton>
+            )}
           </div>
         </>
       )}
