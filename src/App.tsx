@@ -627,8 +627,35 @@ export default function App() {
     setPdfBlob(null)
   }
 
+  const compressImageForPdf = async (file: File) => {
+  const dataUrl = await fileToDataUrl(file)
+  const img = new Image()
+
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve()
+    img.onerror = reject
+    img.src = dataUrl
+  })
+
+  const maxWidth = 1200
+  const scale = Math.min(1, maxWidth / img.width)
+
+  const canvas = document.createElement("canvas")
+  canvas.width = img.width * scale
+  canvas.height = img.height * scale
+
+  const ctx = canvas.getContext("2d")
+  if (!ctx) {
+    throw new Error("Canvas non disponibile")
+  }
+
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+
+  return canvas.toDataURL("image/jpeg", 0.65)
+}
+
   const addImageToPdfPage = async (pdf: jsPDF, file: File, firstPage: boolean) => {
-    const dataUrl = await fileToDataUrl(file)
+    const dataUrl = await compressImageForPdf(file)
     const img = new Image()
 
     await new Promise<void>((resolve, reject) => {
@@ -763,7 +790,7 @@ const handleUploadPdf = async () => {
             subtitle="Scansiona il barcode oppure inserisci la spedizione manualmente."
           />
           <p className="mt-2 text-xs text-slate-400">
-            Versione: v1.7 industriale - Make FTP
+            Versione: v1.7.2 industriale - Make FTP
           </p>
 
           <HeroCard />
