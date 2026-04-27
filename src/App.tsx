@@ -1,49 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Html5Qrcode } from "html5-qrcode"
 import { jsPDF } from "jspdf"
 
-type Screen = "home" | "scan" | "manual" | "pod" | "history"
-type UploadStatus = "Inviato" | "Fallito" | "In coda"
-
-type UploadItem = {
-  id: number
-  spedizione: string
-  file: string
-  pagine: number
-  stato: UploadStatus
-  data: string
-  errore?: string
-}
+type Screen = "home" | "scan" | "manual" | "pod"
 
 const MAKE_WEBHOOK_URL = "https://hook.eu1.make.com/tvnamews4hfy1m1v6lt8aqv9q2oitq7m"
-
-const mockHistory: UploadItem[] = [
-  {
-    id: 1,
-    spedizione: "801-56789",
-    file: "801-56789.pdf",
-    pagine: 2,
-    stato: "Inviato",
-    data: "23/04/2026 09:14",
-  },
-  {
-    id: 2,
-    spedizione: "807-123456",
-    file: "807-123456.pdf",
-    pagine: 1,
-    stato: "Fallito",
-    data: "23/04/2026 08:52",
-    errore: "Connessione FTP non riuscita",
-  },
-  {
-    id: 3,
-    spedizione: "801-99881",
-    file: "801-99881.pdf",
-    pagine: 2,
-    stato: "In coda",
-    data: "22/04/2026 17:41",
-  },
-]
 
 function parseBarcode(barcode: string) {
   const value = barcode.trim()
@@ -130,21 +91,16 @@ function TopBar({
   )
 }
 
-function HeroCard() {
+function InfoPanel() {
   return (
-    <div className="mb-4 rounded-[1.75rem] bg-slate-950 p-5 text-white shadow-lg shadow-slate-900/15">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-            Flusso principale
-          </p>
-          <h2 className="mt-2 text-xl font-semibold">Acquisizione rapida POD</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-300">
-            Honeywell per barcode, fotocamera come fallback, PDF automatico e invio FTP tramite Make.
-          </p>
-        </div>
-        <div className="mt-1 h-3 w-3 rounded-full bg-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.8)]" />
-      </div>
+    <div className="mb-4 rounded-[1.75rem] border border-slate-200 bg-white/80 p-5 shadow-sm">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+        Flusso operativo
+      </p>
+      <p className="mt-2 text-sm leading-6 text-slate-600">
+        1. Leggi il barcode con Honeywell. 2. Scatta la foto del POD. 3. Premi Trasmetti POD:
+        il PDF viene creato e inviato automaticamente.
+      </p>
     </div>
   )
 }
@@ -183,31 +139,13 @@ function ActionButton({
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-3">
-            <div className="text-base font-semibold">{title}</div>
-            <div
-              className={
-                primary
-                  ? "mt-1 h-2.5 w-2.5 rounded-full bg-emerald-400"
-                  : "mt-1 h-2.5 w-2.5 rounded-full bg-slate-300"
-              }
-            />
-          </div>
+          <div className="text-base font-semibold">{title}</div>
           <div className={primary ? "mt-1 text-sm text-slate-300" : "mt-1 text-sm text-slate-500"}>
             {subtitle}
           </div>
         </div>
       </div>
     </button>
-  )
-}
-
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-[1.5rem] border border-slate-200 bg-white/90 p-4 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</p>
-      <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{value}</p>
-    </div>
   )
 }
 
@@ -223,30 +161,6 @@ function SectionCard({
       <h3 className="text-base font-semibold text-slate-900">{title}</h3>
       <div className="mt-4">{children}</div>
     </div>
-  )
-}
-
-function StatusBadge({ status }: { status: UploadStatus }) {
-  if (status === "Inviato") {
-    return (
-      <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
-        Inviato
-      </span>
-    )
-  }
-
-  if (status === "Fallito") {
-    return (
-      <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700 ring-1 ring-red-200">
-        Fallito
-      </span>
-    )
-  }
-
-  return (
-    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
-      In coda
-    </span>
   )
 }
 
@@ -276,6 +190,25 @@ function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
       {...props}
       className="w-full rounded-[1.25rem] border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-900 outline-none placeholder:text-slate-400"
     />
+  )
+}
+
+function SpedizioneCard({ spedizione }: { spedizione: string }) {
+  if (!spedizione) return null
+
+  return (
+    <div className="mb-4">
+      <SectionCard title="Spedizione estratta">
+        <div className="rounded-[1.25rem] bg-slate-50 p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+            Numero spedizione
+          </p>
+          <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+            {spedizione}
+          </p>
+        </div>
+      </SectionCard>
+    </div>
   )
 }
 
@@ -325,9 +258,7 @@ function BarcodeScanner({
     return () => {
       const stopScanner = async () => {
         try {
-          if (scanner.isScanning) {
-            await scanner.stop()
-          }
+          if (scanner.isScanning) await scanner.stop()
           await scanner.clear()
         } catch {
           // niente
@@ -401,9 +332,7 @@ function BarcodeScanner({
       scannerRef.current = scanner
 
       try {
-        if (scanner.isScanning) {
-          await scanner.stop()
-        }
+        if (scanner.isScanning) await scanner.stop()
       } catch {
         // niente
       }
@@ -453,53 +382,25 @@ function BarcodeScanner({
   )
 }
 
-function SpedizioneCard({ spedizione }: { spedizione: string }) {
-  if (!spedizione) return null
-
-  return (
-    <div className="mb-4">
-      <SectionCard title="Spedizione estratta">
-        <div className="rounded-[1.25rem] bg-slate-50 p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-            Numero spedizione
-          </p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-            {spedizione}
-          </p>
-        </div>
-      </SectionCard>
-    </div>
-  )
-}
-
 export default function App() {
   const [screen, setScreen] = useState<Screen>("home")
   const [barcode, setBarcode] = useState("")
   const [spedizione, setSpedizione] = useState("")
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
-  const [search, setSearch] = useState("")
-  const [filter, setFilter] = useState<"tutti" | UploadStatus>("tutti")
   const [honeywellValue, setHoneywellValue] = useState("")
   const [useCamera, setUseCamera] = useState(false)
+
   const [podPage1, setPodPage1] = useState<File | null>(null)
   const [podPage2, setPodPage2] = useState<File | null>(null)
   const [podPage1Preview, setPodPage1Preview] = useState("")
   const [podPage2Preview, setPodPage2Preview] = useState("")
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null)
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false)
+
   const [isUploading, setIsUploading] = useState(false)
 
   const honeywellInputRef = useRef<HTMLInputElement | null>(null)
   const honeywellTimerRef = useRef<number | null>(null)
-
-  const filteredHistory = useMemo(() => {
-    return mockHistory.filter((item) => {
-      const matchesFilter = filter === "tutti" ? true : item.stato === filter
-      const matchesSearch = `${item.spedizione} ${item.file}`.toLowerCase().includes(search.toLowerCase())
-      return matchesFilter && matchesSearch
-    })
-  }, [filter, search])
 
   useEffect(() => {
     if (screen === "scan") {
@@ -529,11 +430,11 @@ export default function App() {
     }
   }, [honeywellValue])
 
-  const goHome = () => {
-    setError("")
-    setSuccess("")
+  const resetApp = () => {
     setBarcode("")
     setSpedizione("")
+    setError("")
+    setSuccess("")
     setHoneywellValue("")
     setUseCamera(false)
     setPodPage1(null)
@@ -544,13 +445,15 @@ export default function App() {
     setScreen("home")
   }
 
-  const goToPodStep = () => {
-    setUseCamera(false)
-    setScreen("pod")
-  }
+  const goHome = () => resetApp()
 
   const focusHoneywell = () => {
     honeywellInputRef.current?.focus()
+  }
+
+  const goToPodStep = () => {
+    setUseCamera(false)
+    setScreen("pod")
   }
 
   const handleBarcodeValue = (rawValue: string) => {
@@ -603,15 +506,13 @@ export default function App() {
       setError("Inserisci un numero spedizione valido.")
       return
     }
+
     setError("")
     setSuccess(`Numero spedizione confermato: ${value}`)
     setScreen("pod")
   }
 
-  const handlePodFile = async (
-    file: File | null,
-    page: 1 | 2
-  ) => {
+  const handlePodFile = async (file: File | null, page: 1 | 2) => {
     if (!file) return
 
     const preview = await fileToDataUrl(file)
@@ -625,34 +526,36 @@ export default function App() {
     }
 
     setPdfBlob(null)
+    setError("")
+    setSuccess("")
   }
 
   const compressImageForPdf = async (file: File) => {
-  const dataUrl = await fileToDataUrl(file)
-  const img = new Image()
+    const dataUrl = await fileToDataUrl(file)
+    const img = new Image()
 
-  await new Promise<void>((resolve, reject) => {
-    img.onload = () => resolve()
-    img.onerror = reject
-    img.src = dataUrl
-  })
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve()
+      img.onerror = reject
+      img.src = dataUrl
+    })
 
-  const maxWidth = 1200
-  const scale = Math.min(1, maxWidth / img.width)
+    const maxWidth = 1200
+    const scale = Math.min(1, maxWidth / img.width)
 
-  const canvas = document.createElement("canvas")
-  canvas.width = img.width * scale
-  canvas.height = img.height * scale
+    const canvas = document.createElement("canvas")
+    canvas.width = img.width * scale
+    canvas.height = img.height * scale
 
-  const ctx = canvas.getContext("2d")
-  if (!ctx) {
-    throw new Error("Canvas non disponibile")
+    const ctx = canvas.getContext("2d")
+    if (!ctx) {
+      throw new Error("Canvas non disponibile")
+    }
+
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+
+    return canvas.toDataURL("image/jpeg", 0.65)
   }
-
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-
-  return canvas.toDataURL("image/jpeg", 0.65)
-}
 
   const addImageToPdfPage = async (pdf: jsPDF, file: File, firstPage: boolean) => {
     const dataUrl = await compressImageForPdf(file)
@@ -684,38 +587,24 @@ export default function App() {
     pdf.addImage(dataUrl, "JPEG", x, y, renderWidth, renderHeight)
   }
 
-  const handleGeneratePdf = async () => {
+  const buildPdfBlob = async () => {
     if (!spedizione) {
-      setError("Manca il numero spedizione.")
-      return
+      throw new Error("Manca il numero spedizione.")
     }
 
     if (!podPage1) {
-      setError("Carica almeno la prima pagina POD.")
-      return
+      throw new Error("Carica almeno la prima pagina POD.")
     }
 
-    try {
-      setIsGeneratingPdf(true)
-      setError("")
-      setSuccess("")
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" })
 
-      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" })
+    await addImageToPdfPage(pdf, podPage1, true)
 
-      await addImageToPdfPage(pdf, podPage1, true)
-
-      if (podPage2) {
-        await addImageToPdfPage(pdf, podPage2, false)
-      }
-
-      const blob = pdf.output("blob")
-      setPdfBlob(blob)
-      setSuccess(`PDF creato correttamente: ${spedizione}.pdf`)
-    } catch {
-      setError("Errore durante la creazione del PDF.")
-    } finally {
-      setIsGeneratingPdf(false)
+    if (podPage2) {
+      await addImageToPdfPage(pdf, podPage2, false)
     }
+
+    return pdf.output("blob")
   }
 
   const handleDownloadPdf = () => {
@@ -729,57 +618,55 @@ export default function App() {
     URL.revokeObjectURL(url)
   }
 
-
-const handleUploadPdf = async () => {
-  if (!pdfBlob || !spedizione) {
-    setError("Prima genera il PDF.")
-    return
-  }
-
-  try {
-    setIsUploading(true)
-    setError("")
-    setSuccess("")
-
-    const formData = new FormData()
-    formData.append("spedizione", spedizione)
-    formData.append("filename", `${spedizione}.pdf`)
-    formData.append("file", pdfBlob, `${spedizione}.pdf`)
-
-    const res = await fetch(MAKE_WEBHOOK_URL, {
-      method: "POST",
-      body: formData,
-    })
-
-    const text = await res.text()
-
-    if (!res.ok) {
-      throw new Error(`Make errore ${res.status}: ${text}`)
+  const handleTransmitPod = async () => {
+    if (!spedizione) {
+      setError("Manca il numero spedizione.")
+      return
     }
 
-    setSuccess(`PDF inviato correttamente: ${spedizione}.pdf`)
-    navigator.vibrate?.(200)
+    if (!podPage1) {
+      setError("Carica almeno la prima pagina POD.")
+      return
+    }
 
-    setTimeout(() => {
-      setBarcode("")
-      setSpedizione("")
+    try {
+      setIsUploading(true)
       setError("")
-      setSuccess("")
-      setHoneywellValue("")
-      setUseCamera(false)
-      setPodPage1(null)
-      setPodPage2(null)
-      setPodPage1Preview("")
-      setPodPage2Preview("")
-      setPdfBlob(null)
-      setScreen("home")
-    }, 1200)
-  } catch (err) {
-    setError(err instanceof Error ? err.message : "Errore invio Make")
-  } finally {
-    setIsUploading(false)
+      setSuccess("Creo PDF...")
+
+      const blob = await buildPdfBlob()
+      setPdfBlob(blob)
+
+      setSuccess("Trasmetto POD...")
+
+      const formData = new FormData()
+      formData.append("spedizione", spedizione)
+      formData.append("filename", `${spedizione}.pdf`)
+      formData.append("file", blob, `${spedizione}.pdf`)
+
+      const res = await fetch(MAKE_WEBHOOK_URL, {
+        method: "POST",
+        body: formData,
+      })
+
+      const text = await res.text()
+
+      if (!res.ok) {
+        throw new Error(`Make errore ${res.status}: ${text}`)
+      }
+
+      setSuccess(`POD trasmesso correttamente: ${spedizione}.pdf`)
+      navigator.vibrate?.(200)
+
+      setTimeout(() => {
+        resetApp()
+      }, 1200)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Errore trasmissione POD")
+    } finally {
+      setIsUploading(false)
+    }
   }
-}
 
   return (
     <Shell>
@@ -787,57 +674,36 @@ const handleUploadPdf = async () => {
         <>
           <TopBar
             title="Acquisizione POD"
-            subtitle="Scansiona il barcode oppure inserisci la spedizione manualmente."
+            subtitle="Scansiona il barcode, fotografa il POD e trasmetti il PDF."
           />
+
           <p className="mt-2 text-xs text-slate-400">
-            Versione: v1.7.2 industriale - Make FTP
+            Versione: v1.8 industriale - trasmissione diretta
           </p>
 
-          <HeroCard />
+          <InfoPanel />
 
           <div className="space-y-3">
             <ActionButton
               title="Scansiona barcode"
-              subtitle="Honeywell automatico, foto barcode o scansione live"
+              subtitle="Metodo principale: Honeywell. Fallback: foto barcode o live scan."
               icon="⌁"
               primary
               onClick={() => {
-                setError("")
-                setSuccess("")
-                setBarcode("")
-                setSpedizione("")
-                setHoneywellValue("")
-                setUseCamera(false)
-                setPodPage1(null)
-                setPodPage2(null)
-                setPodPage1Preview("")
-                setPodPage2Preview("")
-                setPdfBlob(null)
+                resetApp()
                 setScreen("scan")
               }}
             />
+
             <ActionButton
               title="Inserimento manuale"
-              subtitle="Usa questo flusso quando il barcode manca o non è leggibile"
+              subtitle="Usa questo flusso quando il barcode manca o non è leggibile."
               icon="✎"
               onClick={() => {
-                setError("")
-                setSuccess("")
+                resetApp()
                 setScreen("manual")
               }}
             />
-            <ActionButton
-              title="Storico invii"
-              subtitle="Controlla PDF inviati, errori e reinvii"
-              icon="▣"
-              onClick={() => setScreen("history")}
-            />
-          </div>
-
-          <div className="mt-5 grid grid-cols-3 gap-3">
-            <StatCard label="Inviati" value="26" />
-            <StatCard label="Falliti" value="2" />
-            <StatCard label="In coda" value="1" />
           </div>
         </>
       )}
@@ -903,7 +769,7 @@ const handleUploadPdf = async () => {
                 />
 
                 <p className="text-center text-sm text-slate-500">
-                  Usa la fotocamera per scattare una foto ravvicinata del barcode.
+                  Usa la fotocamera solo se Honeywell non è disponibile.
                 </p>
 
                 {!useCamera ? (
@@ -973,7 +839,7 @@ const handleUploadPdf = async () => {
         <>
           <TopBar
             title="Foto POD"
-            subtitle="Scatta una o due foto del POD, genera il PDF e invialo su FTP."
+            subtitle="Scatta la foto del POD. La seconda pagina è opzionale."
             onBack={() => setScreen("scan")}
           />
 
@@ -1018,8 +884,8 @@ const handleUploadPdf = async () => {
           </div>
 
           <div className="mt-4 space-y-3">
-            <PrimaryButton onClick={handleGeneratePdf} disabled={isGeneratingPdf}>
-              {isGeneratingPdf ? "Genero PDF..." : "Genera PDF"}
+            <PrimaryButton onClick={handleTransmitPod} disabled={isUploading}>
+              {isUploading ? "Trasmissione in corso..." : "Trasmetti POD"}
             </PrimaryButton>
 
             <button
@@ -1027,12 +893,8 @@ const handleUploadPdf = async () => {
               disabled={!pdfBlob}
               className="w-full rounded-[1.25rem] border border-slate-200 bg-white px-4 py-4 text-sm font-semibold text-slate-700 shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Scarica PDF
+              Scarica copia PDF
             </button>
-
-            <PrimaryButton onClick={handleUploadPdf} disabled={!pdfBlob || isUploading}>
-              {isUploading ? "Invio su FTP..." : "Invia su FTP"}
-            </PrimaryButton>
           </div>
 
           {error && (
@@ -1060,12 +922,16 @@ const handleUploadPdf = async () => {
           <SpedizioneCard spedizione={spedizione} />
 
           <SectionCard title="Numero spedizione">
-            <label className="mb-2 block text-sm font-medium text-slate-600">Inserisci spedizione</label>
+            <label className="mb-2 block text-sm font-medium text-slate-600">
+              Inserisci spedizione
+            </label>
+
             <TextInput
               placeholder="Es. 801-56789"
               value={spedizione}
               onChange={(e) => setSpedizione(e.target.value)}
             />
+
             <p className="mt-2 text-xs text-slate-500">
               Il nome file finale sarà sempre: numero_spedizione.pdf
             </p>
@@ -1085,73 +951,9 @@ const handleUploadPdf = async () => {
 
           <div className="mt-4 space-y-3">
             <PrimaryButton onClick={handleManualConfirm}>Conferma spedizione</PrimaryButton>
+
             {spedizione && (
               <PrimaryButton onClick={() => setScreen("pod")}>Vai a foto POD</PrimaryButton>
-            )}
-          </div>
-        </>
-      )}
-
-      {screen === "history" && (
-        <>
-          <TopBar
-            title="Storico invii"
-            subtitle="Controlla esiti, errori e documenti in coda."
-            onBack={goHome}
-          />
-
-          <SectionCard title="Ricerca e filtri">
-            <TextInput
-              placeholder="Cerca spedizione o file"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-
-            <div className="mt-3 grid grid-cols-4 gap-2">
-              {["tutti", "Inviato", "Fallito", "In coda"].map((item) => (
-                <button
-                  key={item}
-                  onClick={() => setFilter(item as "tutti" | UploadStatus)}
-                  className={
-                    filter === item
-                      ? "rounded-2xl bg-slate-950 px-3 py-2 text-xs font-semibold text-white"
-                      : "rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600"
-                  }
-                >
-                  {item === "tutti" ? "Tutti" : item}
-                </button>
-              ))}
-            </div>
-          </SectionCard>
-
-          <div className="mt-4 space-y-3">
-            {filteredHistory.map((item) => (
-              <div
-                key={item.id}
-                className="rounded-[1.75rem] border border-slate-200 bg-white/90 p-4 shadow-sm"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-base font-semibold text-slate-900">{item.spedizione}</p>
-                    <p className="mt-1 text-sm text-slate-500">{item.file}</p>
-                  </div>
-                  <StatusBadge status={item.stato} />
-                </div>
-
-                <div className="mt-3 space-y-1 text-sm text-slate-500">
-                  <p>{item.data}</p>
-                  <p>
-                    {item.pagine} {item.pagine === 1 ? "pagina" : "pagine"}
-                  </p>
-                  {item.errore && <p className="text-red-600">{item.errore}</p>}
-                </div>
-              </div>
-            ))}
-
-            {filteredHistory.length === 0 && (
-              <div className="rounded-[1.75rem] border border-slate-200 bg-white/90 p-5 text-center text-sm text-slate-500">
-                Nessun risultato trovato.
-              </div>
             )}
           </div>
         </>
